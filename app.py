@@ -3,7 +3,8 @@ import pandas as pd
 from sqlalchemy import create_engine
 from streamlit_option_menu import option_menu
 import plotly.express as px
-from config import engine
+from config import engine, API_BASE_URL
+import requests
 
 # Constants for styling
 PRIMARY_COLOR = "#F77F00"  
@@ -26,8 +27,8 @@ def setup_sidebar():
         
         selected = option_menu(
             menu_title="Dashboard",
-            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías"],
-            icons=["house", "clock", "star", "search", "list"],
+            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad"],
+            icons=["house", "clock", "star", "search", "list", "search", "bar-chart"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -39,6 +40,42 @@ def setup_sidebar():
         )
     return selected
 
+def update_database():
+    endpoints = [
+        "/homepage-load-time",
+        "/most-liked-restaurants",
+        "/most-used-filters",
+        "/categories-frequencies",
+        "/search-analytics",
+        "/calculate-popularity",
+        "/click-interactions"
+    ]
+    with st.spinner("Actualizando datos..."):
+        for endpoint in endpoints:
+            response = requests.get(f"{API_BASE_URL}{endpoint}")
+            if response.status_code == 200:
+                st.success(f"Datos de {endpoint} actualizados correctamente")
+            else:
+                st.error(f"Error al actualizar {endpoint}: {response.status_code}")
+                
+def clean_database():
+    endpoints = [
+        "/clean-homepage-load-time",
+        "/clean-most-liked-restaurants",
+        "/clean-most-used-filters",
+        "/clean-categories-frequencies",
+        "/clean-search-analytics",
+        "/clean-popularity",
+        "/clean-click-interactions"
+    ]
+    with st.spinner("Vaciando base de datos..."):
+        for endpoint in endpoints:
+            response = requests.get(f"{API_BASE_URL}{endpoint}")
+            if response.status_code == 200:
+                st.success(f"Datos de {endpoint} limpiados correctamente")
+            else:
+                st.error(f"Error al actualizar {endpoint}: {response.status_code}")
+
 # Data fetching function
 @st.cache_data
 def get_data(query):
@@ -49,6 +86,12 @@ def show_inicio():
     st.title("BiteBack Analytics")
     st.subheader("Análisis de Datos de la Aplicación")
     st.markdown("Bienvenido al panel de control de BiteBack. Selecciona una opción en el menú lateral para visualizar métricas y análisis.")
+    
+    if st.button("🔄 Actualizar Información"):
+        update_database()
+        
+    if st.button("🔄 Limpiar Información"):
+        clean_database()
 
 # Page: Tiempo de Carga
 def show_tiempo_de_carga():
@@ -111,6 +154,27 @@ def show_categorias():
     else:
         st.warning("No hay datos disponibles.")
 
+# Page: Búsquedas más populares
+def show_busquedas():
+    st.subheader("Términos de Búsqueda Más Usados")
+    df_searches = get_data("SELECT * FROM searches_analytics ORDER BY count DESC LIMIT 10")
+    if not df_searches.empty:
+        fig = px.bar(df_searches, x="search_term", y="count", title="Búsquedas Más Frecuentes", color_discrete_sequence=[PRIMARY_COLOR])
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles.")
+
+# Page: Popularidad de Categorías
+def show_popularidad():
+    st.subheader("Índice de Popularidad de Categorías")
+    df_popularity = get_data("SELECT * FROM popularity_index ORDER BY popularity_score DESC LIMIT 10")
+    if not df_popularity.empty:
+        fig = px.bar(df_popularity, x="category", y="popularity_score", title="Popularidad de Categorías", color_discrete_sequence=[SECONDARY_COLOR])
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles.")
+
+
 # Main function to handle page selection
 def main():
     selected = setup_sidebar()
@@ -125,6 +189,10 @@ def main():
         show_filtros()
     elif selected == "Categorías":
         show_categorias()
+    elif selected == "Búsquedas":
+        show_busquedas()
+    elif selected == "Popularidad":
+        show_popularidad()
 
 if __name__ == "__main__":
     main()
