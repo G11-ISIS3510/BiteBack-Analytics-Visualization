@@ -58,6 +58,8 @@ def update_database():
             else:
                 st.error(f"Error al actualizar {endpoint}: {response.status_code}")
                 
+    st.cache_data.clear()
+                
 def clean_database():
     endpoints = [
         "/clean-homepage-load-time",
@@ -75,6 +77,8 @@ def clean_database():
                 st.success(f"Datos de {endpoint} limpiados correctamente")
             else:
                 st.error(f"Error al actualizar {endpoint}: {response.status_code}")
+            
+    st.cache_data.clear()
 
 # Data fetching function
 @st.cache_data
