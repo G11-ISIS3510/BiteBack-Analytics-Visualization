@@ -27,8 +27,8 @@ def setup_sidebar():
         
         selected = option_menu(
             menu_title="Dashboard",
-            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad"],
-            icons=["house", "clock", "star", "search", "list", "search", "bar-chart"],
+            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad", "Dispositivos", "Duración Checkout", "Top Productos"],
+            icons=["house", "clock", "star", "search", "list", "search", "bar-chart","phone", "clock", "cart"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -48,7 +48,10 @@ def update_database():
         "/categories-frequencies",
         "/search-analytics",
         "/calculate-popularity",
-        "/click-interactions"
+        "/click-interactions",
+        "/users-by-device",
+        "/checkout-session-analytics"
+        
     ]
     with st.spinner("Actualizando datos..."):
         for endpoint in endpoints:
@@ -68,7 +71,9 @@ def clean_database():
         "/clean-categories-frequencies",
         "/clean-search-analytics",
         "/clean-popularity",
-        "/clean-click-interactions"
+        "/clean-click-interactions",
+        "/clean-users-by-device",
+        "/clean-checkout-session-analytics"
     ]
     with st.spinner("Vaciando base de datos..."):
         for endpoint in endpoints:
@@ -177,6 +182,91 @@ def show_popularidad():
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("No hay datos disponibles.")
+        
+def show_dispositivos():
+    st.subheader("Distribución de Dispositivos por Modelo")
+    df_devices = get_data("SELECT * FROM user_devices ORDER BY user_count DESC")
+
+    if not df_devices.empty:
+        fig = px.pie(df_devices, names='device_model', values='user_count', title='Distribución de Usuarios por Dispositivo', color_discrete_sequence=px.colors.sequential.Oranges)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles sobre dispositivos.")
+
+def show_duracion_checkout():
+    st.subheader("🕒 Tiempo promedio de navegación antes de la compra")
+
+    df = get_data("SELECT * FROM checkout_session_stats")
+
+    if not df.empty:
+        df['week'] = df['week'].astype(int)
+        df['year'] = df['year'].astype(int)
+
+        # Crear fecha a partir del año + semana (lunes como día base)
+        df['fecha'] = pd.to_datetime(df['year'].astype(str) + df['week'].astype(str) + '1', format='%G%V%u')
+
+        selected_year = st.selectbox("Selecciona el año", sorted(df['year'].unique(), reverse=True))
+
+        filtered = df[df['year'] == selected_year].sort_values("fecha")
+
+        # Calcular el promedio anual
+        promedio_anual = filtered['avg_duration'].mean()
+
+        fig = px.line(
+            filtered,
+            x="fecha",
+            y="avg_duration",
+            title=f"Duración Promedio de Navegación - Año {selected_year}",
+            labels={
+                "fecha": "Semana",
+                "avg_duration": "Duración Promedio (ms)"
+            },
+            markers=True,
+            color_discrete_sequence=[PRIMARY_COLOR]
+        )
+
+        # Línea horizontal para mostrar el promedio anual
+        fig.add_hline(
+            y=promedio_anual,
+            line_dash="dot",
+            line_color="gray",
+            annotation_text=f"Promedio anual: {promedio_anual:.0f} ms",
+            annotation_position="top left"
+        )
+
+        fig.update_layout(
+            xaxis_title="Semana del Año",
+            yaxis_title="Duración Promedio (milisegundos)",
+            hovermode="x unified",
+            template="plotly_white"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("⚠️ No hay datos disponibles para mostrar.")
+
+
+
+def show_top_productos():
+    st.subheader("Top Productos más Comprados por Semana")
+    df = get_data("SELECT * FROM top_products_by_week")
+
+    if not df.empty:
+        selected_year = st.selectbox("Selecciona el año", sorted(df['year'].unique(), reverse=True))
+        selected_week = st.selectbox("Selecciona la semana", sorted(df[df['year'] == selected_year]['week'].unique(), reverse=True))
+
+        filtered = df[(df['year'] == selected_year) & (df['week'] == selected_week)]
+
+        fig = px.bar(
+            filtered,
+            x="name",  # ← Este era el error
+            y="quantity",
+            title=f"Top productos semana {selected_week}, {selected_year}",
+            color_discrete_sequence=[SECONDARY_COLOR]
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles para mostrar.")
 
 
 # Main function to handle page selection
@@ -197,6 +287,12 @@ def main():
         show_busquedas()
     elif selected == "Popularidad":
         show_popularidad()
+    elif selected == "Dispositivos":
+        show_dispositivos()
+    elif selected == "Duración Checkout":
+        show_duracion_checkout()
+    elif selected == "Top Productos":
+        show_top_productos()
 
 if __name__ == "__main__":
     main()
