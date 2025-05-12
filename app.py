@@ -27,8 +27,8 @@ def setup_sidebar():
         
         selected = option_menu(
             menu_title="Dashboard",
-            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad", "Dispositivos", "Duración Checkout","Duración purchases" ,"Top Productos"],
-            icons=["house", "clock", "star", "search", "list", "search", "bar-chart","phone", "clock","clock" ,"cart"],
+            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad", "Dispositivos", "Duración Checkout","Duracion en el carrito" ,"Top Productos", "Resumen de compras"],
+            icons=["house", "clock", "star", "search", "list", "search", "bar-chart","phone", "clock","hourglass-split" ,"cart", "clipboard"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -51,7 +51,8 @@ def update_database():
         "/click-interactions",
         "/users-by-device",
         "/checkout-session-analytics",
-        "/avg-checkout-time"
+        "/avg-checkout-time",
+        "/checkout-summary"
         
         
     ]
@@ -331,7 +332,36 @@ def show_duracion_purchases():
     else:
         st.warning("No hay datos disponibles para mostrar.")
 
+def show_checkout_summary():
+    st.subheader("Resumen de Comportamiento de Checkout")
 
+    df_summary = get_data("SELECT * FROM checkout_summary_analytics")
+
+    if not df_summary.empty:
+        # Separar los tipos
+        df_forgotten = df_summary[df_summary["type"] == "forgotten"]
+        df_completed = df_summary[df_summary["type"] == "completed"]
+
+        # Mostrar número de olvidos
+        forgotten_count = int(df_forgotten["sales_count"].sum()) if not df_forgotten.empty else 0
+        st.metric("Veces que los usuarios olvidaron pagar", forgotten_count)
+
+        # Gráfica de barras por día de la semana
+        if not df_completed.empty:
+            fig_bar = px.bar(
+                df_completed.sort_values("day_of_week"),
+                x="day_of_week",
+                y="sales_count",
+                title="Cantidad de Compras Completadas por Día de la Semana",
+                labels={"day_of_week": "Día", "sales_count": "Cantidad"},
+                color_discrete_sequence=[PRIMARY_COLOR]
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            st.info("No hay compras completadas registradas.")
+
+    else:
+        st.warning("No hay datos disponibles para mostrar.")
 
 
 
@@ -358,11 +388,13 @@ def main():
         show_dispositivos()
     elif selected == "Duración Checkout":
         show_duracion_checkout()
-    elif selected == "Duración purchases":
+    elif selected == "Duracion en el carrito":
         show_duracion_purchases()  
-
     elif selected == "Top Productos":
         show_top_productos()
+
+    elif selected == "Resumen de compras":
+        show_checkout_summary()
 
 if __name__ == "__main__":
     main()
