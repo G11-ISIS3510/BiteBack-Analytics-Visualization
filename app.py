@@ -27,8 +27,8 @@ def setup_sidebar():
         
         selected = option_menu(
             menu_title="Dashboard",
-            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad", "Dispositivos", "Duración Checkout", "Top Productos"],
-            icons=["house", "clock", "star", "search", "list", "search", "bar-chart","phone", "clock", "cart"],
+            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad", "Dispositivos", "Duración Checkout","Duración purchases" ,"Top Productos"],
+            icons=["house", "clock", "star", "search", "list", "search", "bar-chart","phone", "clock","clock" ,"cart"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -50,7 +50,9 @@ def update_database():
         "/calculate-popularity",
         "/click-interactions",
         "/users-by-device",
-        "/checkout-session-analytics"
+        "/checkout-session-analytics",
+        "/avg-checkout-time"
+        
         
     ]
     with st.spinner("Actualizando datos..."):
@@ -268,6 +270,71 @@ def show_top_productos():
     else:
         st.warning("No hay datos disponibles para mostrar.")
 
+def show_duracion_purchases():
+    st.subheader("Tiempo Promedio para Finalizar Compra")
+
+    df_checkout = get_data("SELECT * FROM checkout_time_analytics ORDER BY timestamp DESC LIMIT 500")
+
+    if not df_checkout.empty:
+        df_checkout["timestamp"] = pd.to_datetime(df_checkout["timestamp"])
+
+      
+        general_average = df_checkout[(df_checkout["day_of_week"].isna()) & (df_checkout["hour"].isna())]
+        avg_all = general_average["average_minutes"].mean()
+
+     
+        by_day = df_checkout[df_checkout["hour"].isna() & df_checkout["day_of_week"].notna()]
+        avg_day = by_day.groupby("day_of_week")["average_minutes"].mean().reset_index()
+
+       
+        by_hour = df_checkout[df_checkout["day_of_week"].isna() & df_checkout["hour"].notna()]
+        avg_hour = by_hour.groupby("hour")["average_minutes"].mean().reset_index()
+
+        # Average global metrics
+        col1, col2 = st.columns(2)
+        with col1:
+            avg_today = df_checkout[df_checkout["timestamp"].dt.date == pd.Timestamp.today().date()]["average_minutes"].mean()
+            st.metric("Promedio de hoy", f"{avg_today:.2f} min" if pd.notna(avg_today) else "N/A")
+        with col2:
+            st.metric("Promedio general", f"{avg_all:.2f} min" if pd.notna(avg_all) else "N/A")
+
+        # Line graph
+        fig_line = px.line(
+            df_checkout.sort_values("timestamp"),
+            x="timestamp",
+            y="average_minutes",
+            title="Evolución del Tiempo Promedio de Checkout",
+            color_discrete_sequence=[SECONDARY_COLOR]
+        )
+        st.plotly_chart(fig_line, use_container_width=True)
+
+        # Pie char per day
+        fig_pie = px.pie(
+            avg_day,
+            names="day_of_week",
+            values="average_minutes",
+            title="Promedio de tiempo de compra por dia"
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+        # BarChar by Hour
+        fig_bar = px.bar(
+            avg_hour.sort_values("hour"),
+            x="hour",
+            y="average_minutes",
+            title="Promedio de tiempo de compra por Hora del Día",
+            labels={"hour": "Hora", "average_minutes": "Minutos"}
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+      
+    else:
+        st.warning("No hay datos disponibles para mostrar.")
+
+
+
+
+
 
 # Main function to handle page selection
 def main():
@@ -291,6 +358,9 @@ def main():
         show_dispositivos()
     elif selected == "Duración Checkout":
         show_duracion_checkout()
+    elif selected == "Duración purchases":
+        show_duracion_purchases()  
+
     elif selected == "Top Productos":
         show_top_productos()
 
