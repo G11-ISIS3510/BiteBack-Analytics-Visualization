@@ -27,8 +27,8 @@ def setup_sidebar():
         
         selected = option_menu(
             menu_title="Dashboard",
-            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad", "Dispositivos", "Duración Checkout","Duracion en el carrito" ,"Top Productos", "Resumen de compras"],
-            icons=["house", "clock", "star", "search", "list", "search", "bar-chart","phone", "clock","hourglass-split" ,"cart", "clipboard"],
+            options=["Inicio", "Tiempo de Carga", "Restaurantes", "Filtros", "Categorías","Búsquedas", "Popularidad", "Dispositivos", "Duración Checkout","Duracion en el carrito" ,"Top Productos", "Resumen de compras", "Tiempo de Carga Cart", "Pares de Productos", "Android Versions", "Android SDK"],
+            icons=["house", "clock", "star", "search", "list", "search", "bar-chart","phone", "clock","hourglass-split" ,"cart", "clipboard", "clock", "link", "android", "cogs"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -52,10 +52,14 @@ def update_database():
         "/users-by-device",
         "/checkout-session-analytics",
         "/avg-checkout-time",
-        "/checkout-summary"
-        
-        
+        "/checkout-summary",
+        "/cartpage-load-time",
+        "/most-common-product-pairs",
+        "/users-by-android-version",
+        "/users-by-android-sdk"
     ]
+        
+        
     with st.spinner("Actualizando datos..."):
         for endpoint in endpoints:
             response = requests.get(f"{API_BASE_URL}{endpoint}")
@@ -76,7 +80,12 @@ def clean_database():
         "/clean-popularity",
         "/clean-click-interactions",
         "/clean-users-by-device",
-        "/clean-checkout-session-analytics"
+        "/clean-checkout-session-analytics",
+        "/clean-cartpage-load-time",
+        "/clean-product-pairs",
+        "/clean-user-android-versions",
+        "/clean-user-android-sdks"
+    
     ]
     with st.spinner("Vaciando base de datos..."):
         for endpoint in endpoints:
@@ -362,6 +371,70 @@ def show_checkout_summary():
 
     else:
         st.warning("No hay datos disponibles para mostrar.")
+        
+        
+# Gráfica: Tiempo de carga CartScreen
+
+def show_tiempo_de_carga_cart():
+    st.subheader("⏳ Tiempo de Carga - Vista del Carrito")
+    df = get_data("SELECT * FROM cartpage_load_time ORDER BY timestamp DESC LIMIT 1000")
+
+    if not df.empty:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+        start, end = st.date_input("Rango de fechas", [df['timestamp'].min(), df['timestamp'].max()])
+        filtered = df[(df['timestamp'] >= pd.to_datetime(start)) & (df['timestamp'] <= pd.to_datetime(end))]
+
+        if not filtered.empty:
+            col1, col2 = st.columns(2)
+            with col1:
+                fig_box = px.box(filtered, y="load_time", title="Distribución del Tiempo de Carga del Carrito", color_discrete_sequence=[SECONDARY_COLOR])
+                st.plotly_chart(fig_box, use_container_width=True)
+            with col2:
+                fig_hist = px.histogram(filtered, x="load_time", title="Histograma de Tiempos de Carga del Carrito", color_discrete_sequence=[PRIMARY_COLOR])
+                st.plotly_chart(fig_hist, use_container_width=True)
+        else:
+            st.warning("No hay datos en el rango seleccionado.")
+    else:
+        st.warning("No hay datos disponibles.")
+
+# Gráfica: Pares de productos más comprados juntos
+
+def show_product_pairs():
+    st.subheader("🔗 Productos Comprados Juntos con Mayor Frecuencia")
+    df = get_data("SELECT * FROM product_pair_analytics ORDER BY count DESC LIMIT 10")
+    if not df.empty:
+
+        df['pair'] = df['name_a'] + " + " + df['name_b']
+        fig = px.bar(df.sort_values("count", ascending=False), x="pair", y="count", title="Pares de productos más vendidos")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles.")
+
+# Gráfica: Usuarios por versión de Android
+
+def show_android_versions():
+    st.subheader("📱 Usuarios por Versión de Android")
+    df = get_data("SELECT * FROM user_android_versions ORDER BY user_count DESC")
+
+    if not df.empty:
+        fig = px.pie(df, names='android_version', values='user_count', title='Distribución de Usuarios por Versión de Android', color_discrete_sequence=px.colors.sequential.Oranges)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles.")
+
+# Gráfica: Usuarios por SDK
+
+def show_android_sdk():
+    st.subheader("🔢 Usuarios por Nivel de SDK (Android)")
+    df = get_data("SELECT * FROM user_android_sdks ORDER BY user_count DESC")
+
+    if not df.empty:
+        fig = px.bar(df, x="android_sdk", y="user_count", title="Usuarios por Nivel de SDK", color_discrete_sequence=[PRIMARY_COLOR])
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles.")
+
 
 
 
@@ -392,7 +465,14 @@ def main():
         show_duracion_purchases()  
     elif selected == "Top Productos":
         show_top_productos()
-
+    elif selected == "Tiempo de Carga Cart":
+        show_tiempo_de_carga_cart()
+    elif selected == "Pares de Productos":
+        show_product_pairs()
+    elif selected == "Android Versions":
+        show_android_versions()
+    elif selected == "Android SDK":
+        show_android_sdk()
     elif selected == "Resumen de compras":
         show_checkout_summary()
 
