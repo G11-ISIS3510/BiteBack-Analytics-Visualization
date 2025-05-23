@@ -97,6 +97,26 @@ def clean_database():
             
     st.cache_data.clear()
 
+@st.cache_data
+def fetch_high_click_low_sales():
+    response = requests.get(f"{API_BASE_URL}/high-click-low-sales")
+    if response.status_code == 200:
+        return pd.DataFrame(response.json())
+    else:
+        return pd.DataFrame()
+
+@st.cache_data
+def fetch_category_combinations():
+    response = requests.get(f"{API_BASE_URL}/most-common-category-combinations")
+    if response.status_code == 200:
+        data = response.json()
+        for item in data:
+            item["pair"] = " + ".join(item["category_combination"])
+        return pd.DataFrame(data)
+    else:
+        return pd.DataFrame()
+
+
 # Data fetching function
 @st.cache_data
 def get_data(query):
@@ -174,6 +194,33 @@ def show_categorias():
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("No hay datos disponibles.")
+
+    df_click_sales = fetch_high_click_low_sales()
+    if not df_click_sales.empty:
+        fig_ratio = px.bar(
+            df_click_sales,
+            x="category_product_name",
+            y="click_to_sale_ratio",
+            title="Ratio de Clicks vs Ventas por Categoría",
+            color_discrete_sequence=[PRIMARY_COLOR]
+        )
+        st.plotly_chart(fig_ratio, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles para el ratio de clics contra ventas.")
+
+    df_combos = fetch_category_combinations()
+    if not df_combos.empty:
+        fig_combos = px.bar(
+            df_combos.sort_values("count", ascending=False),
+            x="pair",
+            y="count",
+            title="Combinaciones de Categorías más Comunes",
+            color_discrete_sequence=[SECONDARY_COLOR]
+        )
+        st.plotly_chart(fig_combos, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles sobre combinaciones de categorías.")
+
 
 # Page: Búsquedas más populares
 def show_busquedas():
